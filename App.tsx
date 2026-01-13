@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+// Components
 import GhostWidget from './components/GhostWidget';
 import Bookshelf from './components/Bookshelf';
 import ReadingStream from './components/ReadingStream';
@@ -12,10 +13,23 @@ const App: React.FC = () => {
   // Use a trigger to refresh data when new entry is added
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
+  // Check for Ghost Mode (Standalone URL)
+  const [isGhostMode, setIsGhostMode] = useState(false);
+
+  useEffect(() => {
+    // Check if URL has ?mode=ghost
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('mode') === 'ghost') {
+      setIsGhostMode(true);
+    }
+  }, []);
+
   // Load available years on mount and when data changes
   useEffect(() => {
-    setYears(getYears());
-  }, [refreshTrigger]);
+    if (!isGhostMode) {
+        setYears(getYears());
+    }
+  }, [refreshTrigger, isGhostMode]);
 
   const handleEntrySaved = () => {
     // Increment trigger to notify children to reload
@@ -31,6 +45,23 @@ const App: React.FC = () => {
     setViewMode(ViewMode.BOOKSHELF);
   };
 
+  // ---------------------------------------------------------
+  // GHOST MODE RENDER (For Menu Bar / Quick Capture Window)
+  // ---------------------------------------------------------
+  if (isGhostMode) {
+    return (
+      <div className="w-screen h-screen bg-transparent overflow-hidden flex items-center justify-center">
+        <GhostWidget 
+          onEntrySaved={handleEntrySaved} 
+          isStandalone={true} 
+        />
+      </div>
+    );
+  }
+
+  // ---------------------------------------------------------
+  // NORMAL APP RENDER
+  // ---------------------------------------------------------
   return (
     // changed h-screen to h-[100dvh] for better mobile/safari support
     <div className="relative w-full h-[100dvh] overflow-hidden flex flex-col font-serif text-charcoal bg-cosmic-latte selection:bg-muted-gold/30">
@@ -52,7 +83,7 @@ const App: React.FC = () => {
         )}
       </main>
 
-      {/* Ghost Widget - Always accessible */}
+      {/* Ghost Widget - Always accessible in normal mode */}
       <GhostWidget onEntrySaved={handleEntrySaved} />
 
     </div>
