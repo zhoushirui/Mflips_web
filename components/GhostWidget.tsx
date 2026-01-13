@@ -1,19 +1,25 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Send, X, PenTool, Bold, Underline, Type } from 'lucide-react';
 import { saveEntry } from '../services/storageService';
 import { ColorTag } from '../types';
 
 interface GhostWidgetProps {
   onEntrySaved: () => void;
+  isStandalone?: boolean; // New prop for Ghost Mode
 }
 
-const GhostWidget: React.FC<GhostWidgetProps> = ({ onEntrySaved }) => {
-  const [isOpen, setIsOpen] = useState(false);
+const GhostWidget: React.FC<GhostWidgetProps> = ({ onEntrySaved, isStandalone = false }) => {
+  const [isOpen, setIsOpen] = useState(isStandalone);
   const [text, setText] = useState('');
   const [isAnimating, setIsAnimating] = useState(false);
   const [useSansFont, setUseSansFont] = useState(false);
   const [selectedColor, setSelectedColor] = useState<ColorTag | undefined>(undefined);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Force open if standalone
+  useEffect(() => {
+    if (isStandalone) setIsOpen(true);
+  }, [isStandalone]);
 
   const handleSubmit = useCallback(() => {
     if (!text.trim()) return;
@@ -25,10 +31,17 @@ const GhostWidget: React.FC<GhostWidgetProps> = ({ onEntrySaved }) => {
       setText('');
       setSelectedColor(undefined);
       setIsAnimating(false);
-      setIsOpen(false);
       onEntrySaved();
+      
+      if (!isStandalone) {
+        setIsOpen(false);
+      } else {
+        // In standalone mode, maybe show a "Saved!" toast, but keep window open or close it?
+        // For now, let's keep it open for rapid entry, or user can close window.
+        // Optional: window.close() if it was a popup, but safer to just clear.
+      }
     }, 600);
-  }, [text, selectedColor, onEntrySaved]);
+  }, [text, selectedColor, onEntrySaved, isStandalone]);
 
   const insertFormat = (tag: 'bold' | 'underline') => {
     const textarea = textareaRef.current;
@@ -49,7 +62,8 @@ const GhostWidget: React.FC<GhostWidgetProps> = ({ onEntrySaved }) => {
     textarea.focus();
   };
 
-  if (!isOpen) {
+  // 1. Render the Trigger Button (Only if NOT standalone and NOT open)
+  if (!isOpen && !isStandalone) {
     return (
       <button
         onClick={() => setIsOpen(true)}
@@ -61,14 +75,25 @@ const GhostWidget: React.FC<GhostWidgetProps> = ({ onEntrySaved }) => {
     );
   }
 
+  // Styles based on mode
+  const containerClasses = isStandalone
+    ? "relative w-full h-full bg-[#F9F9F9] flex flex-col p-4" // Standalone: Full screen, simple bg
+    : "relative w-[320px] md:w-[450px] min-h-[250px] bg-[#F9F9F9]/90 backdrop-blur-xl border border-white/60 rounded-xl shadow-2xl p-6 flex flex-col transition-all animate-in fade-in zoom-in-95 duration-200"; // Widget: Floating card
+
+  const wrapperClasses = isStandalone
+    ? "fixed inset-0 z-50 bg-white" // Standalone: No dark overlay
+    : "fixed inset-0 z-50 flex items-center justify-center bg-black/5 backdrop-blur-[2px]"; // Widget: Dark overlay
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/5 backdrop-blur-[2px]">
-      <div className="relative w-[320px] md:w-[450px] min-h-[250px] bg-[#F9F9F9]/90 backdrop-blur-xl border border-white/60 rounded-xl shadow-2xl p-6 flex flex-col transition-all animate-in fade-in zoom-in-95 duration-200">
+    <div className={wrapperClasses}>
+      <div className={containerClasses}>
         
         {/* Header */}
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex justify-between items-center mb-4 shrink-0">
           <div className="flex items-center gap-3">
-             <span className="text-xs font-serif font-bold text-gray-400 tracking-widest uppercase">New Memory</span>
+             <span className="text-xs font-serif font-bold text-gray-400 tracking-widest uppercase">
+                {isStandalone ? 'Ghost Mode' : 'New Memory'}
+             </span>
              
              {/* Font Toggle */}
              <button 
@@ -80,16 +105,22 @@ const GhostWidget: React.FC<GhostWidgetProps> = ({ onEntrySaved }) => {
              </button>
           </div>
 
-          <button 
-            onClick={() => setIsOpen(false)}
-            className="p-1 hover:bg-black/5 rounded-full transition-colors"
-          >
-            <X className="w-4 h-4 text-gray-500" />
-          </button>
+          {!isStandalone ? (
+              <button 
+                onClick={() => setIsOpen(false)}
+                className="p-1 hover:bg-black/5 rounded-full transition-colors"
+              >
+                <X className="w-4 h-4 text-gray-500" />
+              </button>
+          ) : (
+             // In standalone, maybe a close button that tries to close window?
+             // Or just nothing to keep it clean.
+             null
+          )}
         </div>
 
         {/* Toolbar */}
-        <div className="flex items-center gap-2 mb-2">
+        <div className="flex items-center gap-2 mb-2 shrink-0">
             <button onClick={() => insertFormat('bold')} className="p-1.5 text-gray-400 hover:text-charcoal hover:bg-black/5 rounded" title="Bold">
                 <Bold className="w-4 h-4" />
             </button>
@@ -123,11 +154,11 @@ const GhostWidget: React.FC<GhostWidgetProps> = ({ onEntrySaved }) => {
           onChange={(e) => setText(e.target.value)}
           placeholder="Capture the moment..."
           className={`w-full flex-grow bg-transparent border-none resize-none outline-none text-charcoal text-lg placeholder-gray-400 leading-relaxed ${useSansFont ? 'font-sans' : 'font-serif'}`}
-          style={{ minHeight: '120px' }}
+          style={{ minHeight: isStandalone ? 'auto' : '120px' }}
         />
 
         {/* Footer Actions */}
-        <div className="flex justify-end mt-4 pt-4 border-t border-gray-200/50">
+        <div className="flex justify-end mt-4 pt-4 border-t border-gray-200/50 shrink-0">
           <button
             onClick={handleSubmit}
             disabled={!text.trim() || isAnimating}
