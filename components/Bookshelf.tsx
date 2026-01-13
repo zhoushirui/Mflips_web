@@ -1,5 +1,5 @@
-import React, { useRef, useState } from 'react';
-import { Book, UploadCloud, Loader2, CheckCircle2 } from 'lucide-react';
+import React, { useRef, useState, useEffect } from 'react';
+import { Book, UploadCloud, Loader2, CheckCircle2, Download } from 'lucide-react';
 import { importFromDoc } from '../services/storageService';
 
 interface BookshelfProps {
@@ -13,6 +13,36 @@ const Bookshelf: React.FC<BookshelfProps> = ({ years, onYearSelect, onDataChange
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [importStatus, setImportStatus] = useState<string | null>(null);
+  
+  // State for PWA Install Prompt
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  useEffect(() => {
+    // Listen for the 'beforeinstallprompt' event
+    const handler = (e: any) => {
+      // Prevent the mini-infobar from appearing on mobile
+      e.preventDefault();
+      // Stash the event so it can be triggered later.
+      setDeferredPrompt(e);
+    };
+
+    window.addEventListener('beforeinstallprompt', handler);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handler);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    // Show the install prompt
+    deferredPrompt.prompt();
+    // Wait for the user to respond to the prompt
+    const { outcome } = await deferredPrompt.userChoice;
+    console.log(`User response to the install prompt: ${outcome}`);
+    // We've used the prompt, and can't use it again, throw it away
+    setDeferredPrompt(null);
+  };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -43,37 +73,51 @@ const Bookshelf: React.FC<BookshelfProps> = ({ years, onYearSelect, onDataChange
   return (
     <div className="flex-1 p-8 md:p-16 overflow-y-auto bg-cosmic-latte">
       <div className="max-w-4xl mx-auto">
-        {/* Header with Import Action */}
+        {/* Header with Actions */}
         <div className="flex items-end justify-between mb-12 border-b border-muted-gold/30 pb-4">
             <h1 className="text-3xl font-serif text-charcoal tracking-wide">
             The Library
             </h1>
 
-            <div className="flex flex-col items-end">
-                <input 
-                    type="file" 
-                    ref={fileInputRef}
-                    accept=".doc,.html" 
-                    onChange={handleFileChange}
-                    className="hidden" 
-                />
-                
-                <button 
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isImporting}
-                    className="flex items-center gap-2 text-xs font-sans font-bold text-gray-400 hover:text-charcoal cursor-pointer transition-colors uppercase tracking-widest group"
-                >
-                    {isImporting ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : importStatus ? (
-                         <CheckCircle2 className="w-4 h-4 text-tag-green" />
-                    ) : (
-                        <UploadCloud className="w-4 h-4 group-hover:-translate-y-0.5 transition-transform" />
-                    )}
-                    <span>
-                        {isImporting ? 'Restoring...' : importStatus ? importStatus : 'Restore Backup'}
-                    </span>
-                </button>
+            <div className="flex items-center gap-6">
+                {/* Install App Button (Only shows if installable) */}
+                {deferredPrompt && (
+                    <button 
+                        onClick={handleInstallClick}
+                        className="flex items-center gap-2 text-xs font-sans font-bold text-charcoal/70 hover:text-charcoal cursor-pointer transition-colors uppercase tracking-widest group bg-white/50 px-3 py-1.5 rounded-full hover:bg-white border border-transparent hover:border-muted-gold/20"
+                    >
+                        <Download className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                        <span>Install App</span>
+                    </button>
+                )}
+
+                {/* Import Button */}
+                <div className="flex flex-col items-end">
+                    <input 
+                        type="file" 
+                        ref={fileInputRef}
+                        accept=".doc,.html" 
+                        onChange={handleFileChange}
+                        className="hidden" 
+                    />
+                    
+                    <button 
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isImporting}
+                        className="flex items-center gap-2 text-xs font-sans font-bold text-gray-400 hover:text-charcoal cursor-pointer transition-colors uppercase tracking-widest group"
+                    >
+                        {isImporting ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : importStatus ? (
+                            <CheckCircle2 className="w-4 h-4 text-tag-green" />
+                        ) : (
+                            <UploadCloud className="w-4 h-4 group-hover:-translate-y-0.5 transition-transform" />
+                        )}
+                        <span>
+                            {isImporting ? 'Restoring...' : importStatus ? importStatus : 'Restore Backup'}
+                        </span>
+                    </button>
+                </div>
             </div>
         </div>
         
