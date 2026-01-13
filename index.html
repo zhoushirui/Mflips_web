@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Mflip - Serenity Diary</title>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#F7F5F0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              'cosmic-latte': '#F7F5F0', // Lighter, high-end beige
+              'warm-grey': '#EBE9E4',
+              'charcoal': '#2D2D2D',
+              'muted-gold': '#C5B495',
+              'paper': '#FFFFFF',
+              'tag-red': '#E57373',
+              'tag-yellow': '#F0D588',
+              'tag-green': '#81C784',
+            },
+            fontFamily: {
+              serif: ['"Songti SC"', '"SimSun"', '"Times New Roman"', 'serif'],
+              sans: ['"Microsoft YaHei"', '"Helvetica Neue"', 'sans-serif'],
+            },
+          },
+        },
+      }
+    </script>
+    <style>
+      html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        overflow: hidden; /* Prevent body scroll, let App handle it */
+        background-color: #F7F5F0;
+      }
+      /* Custom Scrollbar for a cleaner look */
+      ::-webkit-scrollbar {
+        width: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #C5B495;
+        border-radius: 3px;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0"
+  }
+}
+</script>
+<script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js')
+                .then(registration => {
+                    console.log('SW registered:', registration);
+                })
+                .catch(error => {
+                    console.log('SW registration failed:', error);
+                });
+        });
+    }
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <div id="root" style="height: 100%;"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
