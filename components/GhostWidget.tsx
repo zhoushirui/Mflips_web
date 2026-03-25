@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { Send, X, PenTool, Bold, Underline, Type } from 'lucide-react';
+import { Send, X, PenTool, Bold, Underline, Italic, Type } from 'lucide-react';
 import { saveEntry } from '../services/storageService';
 import { ColorTag } from '../types';
 
@@ -54,6 +54,8 @@ const GhostWidget: React.FC<GhostWidgetProps> = ({ onEntrySaved, isStandalone = 
 
     if (tag === 'bold') {
       newText = text.substring(0, start) + `**${selectedText}**` + text.substring(end);
+    } else if (tag === 'italic') {
+      newText = text.substring(0, start) + `*${selectedText}*` + text.substring(end);
     } else if (tag === 'underline') {
       newText = text.substring(0, start) + `<u>${selectedText}</u>` + text.substring(end);
     }
@@ -123,6 +125,9 @@ const GhostWidget: React.FC<GhostWidgetProps> = ({ onEntrySaved, isStandalone = 
         <div className="flex items-center gap-2 mb-2 shrink-0">
             <button onClick={() => insertFormat('bold')} className="p-1.5 text-gray-400 hover:text-charcoal hover:bg-black/5 rounded" title="Bold">
                 <Bold className="w-4 h-4" />
+            </button>
+            <button onClick={() => insertFormat('italic')} className="p-1.5 text-gray-400 hover:text-charcoal hover:bg-black/5 rounded" title="Italic">
+                <Italic className="w-4 h-4" />
             </button>
             <button onClick={() => insertFormat('underline')} className="p-1.5 text-gray-400 hover:text-charcoal hover:bg-black/5 rounded" title="Underline">
                 <Underline className="w-4 h-4" />

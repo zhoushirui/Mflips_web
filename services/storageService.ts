@@ -34,6 +34,13 @@ export const updateEntry = (id: string, newContent: string): void => {
   }
 };
 
+// Delete an entry by id
+export const deleteEntry = (id: string): void => {
+  const allData = getAllData();
+  const filtered = allData.filter(d => d.id !== id);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+};
+
 export const getAllData = (): DiaryEntry[] => {
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) return [];
@@ -48,7 +55,7 @@ export const getAllData = (): DiaryEntry[] => {
 export const getYears = (): number[] => {
   const data = getAllData();
   const years = new Set(data.map(d => new Date(d.timestamp).getFullYear()));
-  return Array.from(years).sort((a, b) => b - a); // Descending
+  return Array.from(years).sort((a, b) => b - a);
 };
 
 export const getMonthsForYear = (year: number): number[] => {
@@ -58,7 +65,7 @@ export const getMonthsForYear = (year: number): number[] => {
       .filter(d => new Date(d.timestamp).getFullYear() === year)
       .map(d => new Date(d.timestamp).getMonth() + 1)
   );
-  return Array.from(months).sort((a, b) => a - b); // Ascending Jan -> Dec
+  return Array.from(months).sort((a, b) => a - b);
 };
 
 export const getEntriesForMonth = (year: number, month: number): DiaryEntry[] => {
@@ -66,20 +73,42 @@ export const getEntriesForMonth = (year: number, month: number): DiaryEntry[] =>
   return data
     .filter(d => {
       const date = new Date(d.timestamp);
-      // Month in JS Date is 0-11, our input is 1-12
       return date.getFullYear() === year && (date.getMonth() + 1) === month;
     })
-    .sort((a, b) => b.timestamp - a.timestamp); // Newest first
+    .sort((a, b) => b.timestamp - a.timestamp);
 };
 
 export const getEntriesForYear = (year: number): DiaryEntry[] => {
   const data = getAllData();
   return data
     .filter(d => new Date(d.timestamp).getFullYear() === year)
-    .sort((a, b) => a.timestamp - b.timestamp); // Oldest first for stats usually, but doesn't matter much
+    .sort((a, b) => a.timestamp - b.timestamp);
 };
 
-// Export to Docx (Simulated HTML)
+// Global full-text search across all entries
+export const searchEntries = (query: string): DiaryEntry[] => {
+  if (!query.trim()) return [];
+  const data = getAllData();
+  const lower = query.toLowerCase();
+  return data
+    .filter(d => d.content.toLowerCase().includes(lower))
+    .sort((a, b) => b.timestamp - a.timestamp)
+    .slice(0, 60);
+};
+
+// Convert markdown to HTML for .doc export display
+const markdownToHtml = (text: string): string =>
+  text
+    .replace(/\*\*([^*]+?)\*\*/g, '<b>$1</b>')
+    .replace(/\*([^*]+?)\*/g, '<i>$1</i>')
+    .replace(/~~(.+?)~~/g, '<s>$1</s>')
+    .replace(/`([^`]+?)`/g, '<code>$1</code>')
+    .replace(/<u>(.+?)<\/u>/g, '<u>$1</u>');
+
+const escapeAttr = (s: string): string =>
+  s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+// Export to .doc — preserves color tags and raw markdown via data attributes
 export const exportMonthToDoc = (year: number, month: number) => {
   const entries = getEntriesForMonth(year, month);
   if (entries.length === 0) return;
@@ -89,32 +118,33 @@ export const exportMonthToDoc = (year: number, month: number) => {
     <head><meta charset='utf-8'><title>Diary Export</title>
     <style>
       body { font-family: 'Songti SC', 'SimSun', serif; }
-      .entry { margin-bottom: 32px; } /* Increased margin, removed border */
+      .entry { margin-bottom: 32px; }
       .meta { font-weight: bold; color: #666; font-size: 10pt; margin-bottom: 8px; }
       .content { font-size: 12pt; white-space: pre-wrap; line-height: 1.6; }
+      .color-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-left: 6px; vertical-align: middle; }
+      .red { background: #E57373; } .yellow { background: #F0D588; } .green { background: #81C784; }
     </style>
     </head><body>
-    <h1>Mflip Diary - ${year} / ${month}</h1>
-    <br/>
+    <h1>Mflip Diary - ${year} / ${month}</h1><br/>
   `;
 
   entries.forEach(entry => {
-    // Simple logic to strip markdown for doc export
-    const cleanContent = entry.content.replace(/\*\*(.*?)\*\*/g, '$1').replace(/<u>(.*?)<\/u>/g, '$1');
+    const colorAttr = entry.colorTag ? ` data-color="${entry.colorTag}"` : '';
+    const rawAttr = ` data-raw="${escapeAttr(entry.content)}"`;
+    const colorDot = entry.colorTag
+      ? `<span class="color-dot ${entry.colorTag}"></span>`
+      : '';
     docContent += `
-      <div class="entry">
-        <div class="meta">${entry.formattedDate}</div>
-        <div class="content">${cleanContent}</div>
+      <div class="entry"${colorAttr}${rawAttr}>
+        <div class="meta">${entry.formattedDate}${colorDot}</div>
+        <div class="content">${markdownToHtml(entry.content)}</div>
       </div>
     `;
   });
 
   docContent += "</body></html>";
 
-  const blob = new Blob(['\ufeff', docContent], {
-    type: 'application/msword'
-  });
-
+  const blob = new Blob(['\ufeff', docContent], { type: 'application/msword' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
@@ -124,9 +154,9 @@ export const exportMonthToDoc = (year: number, month: number) => {
   document.body.removeChild(link);
 };
 
-// Import from Doc (Restore Backup)
+// Import from .doc — restores color tags and raw markdown content
 export const importFromDoc = async (file: File): Promise<number> => {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const reader = new FileReader();
     reader.onload = (e) => {
       const text = e.target?.result as string;
@@ -135,58 +165,58 @@ export const importFromDoc = async (file: File): Promise<number> => {
       try {
         const parser = new DOMParser();
         const doc = parser.parseFromString(text, 'text/html');
-        // Our export format uses div.entry, div.meta, div.content
         const entryDivs = doc.querySelectorAll('.entry');
-        
+
         const existingData = getAllData();
         const newEntries: DiaryEntry[] = [];
-        
+
         entryDivs.forEach(div => {
-            const meta = div.querySelector('.meta')?.textContent;
-            // use textContent to get plain text (stripping html tags if any)
-            const content = div.querySelector('.content')?.textContent; 
+          const el = div as HTMLElement;
+          // Strip color dot text from meta
+          const metaEl = div.querySelector('.meta');
+          const metaDots = metaEl?.querySelectorAll('.color-dot');
+          metaDots?.forEach(d => d.remove());
+          const meta = metaEl?.textContent?.trim();
 
-            if (meta && content) {
-                // Parse date: YYYY.MM.DD HH:MM:SS
-                // Replace dots with dashes for better JS date parsing support
-                const timeStr = meta.replace(/\./g, '-');
-                const timestamp = Date.parse(timeStr);
+          // Prefer data-raw (lossless); fall back to rendered textContent
+          const rawContent = el.dataset.raw;
+          const content = rawContent || div.querySelector('.content')?.textContent;
+          const colorTag = (el.dataset.color as ColorTag) || undefined;
 
-                if (!isNaN(timestamp)) {
-                    // Duplicate Check: Same timestamp OR (Similar time AND Same content)
-                    const isDup = existingData.some(ed => 
-                        ed.timestamp === timestamp || 
-                        (Math.abs(ed.timestamp - timestamp) < 5000 && ed.content === content)
-                    );
+          if (meta && content) {
+            const timeStr = meta.replace(/\./g, '-');
+            const timestamp = Date.parse(timeStr);
 
-                    if (!isDup) {
-                        newEntries.push({
-                            id: crypto.randomUUID(),
-                            timestamp: timestamp,
-                            content: content.trim(), // Import as plain text
-                            formattedDate: meta.trim(),
-                            // colorTag is lost in doc format, that's expected
-                        });
-                    }
-                }
+            if (!isNaN(timestamp)) {
+              const isDup = existingData.some(ed =>
+                ed.timestamp === timestamp ||
+                (Math.abs(ed.timestamp - timestamp) < 5000 && ed.content === content.trim())
+              );
+
+              if (!isDup) {
+                newEntries.push({
+                  id: crypto.randomUUID(),
+                  timestamp,
+                  content: content.trim(),
+                  formattedDate: meta,
+                  colorTag,
+                });
+              }
             }
+          }
         });
 
         if (newEntries.length > 0) {
-            const mergedData = [...existingData, ...newEntries];
-            // Sort by time
-            mergedData.sort((a, b) => a.timestamp - b.timestamp);
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(mergedData));
+          const mergedData = [...existingData, ...newEntries].sort((a, b) => a.timestamp - b.timestamp);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(mergedData));
         }
 
         resolve(newEntries.length);
-
       } catch (err) {
         console.error("Import Parsing Error", err);
-        resolve(0); // Fail gracefully
+        resolve(0);
       }
     };
-    // .doc is actually HTML in our case, so read as text
     reader.readAsText(file);
   });
 };
