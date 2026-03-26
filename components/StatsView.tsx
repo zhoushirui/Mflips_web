@@ -1,13 +1,21 @@
-import React, { useMemo } from 'react';
-import { DiaryEntry, MONTH_NAMES } from '../types';
-import { BarChart3, Type, Smile } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { DiaryEntry, ColorTag, MONTH_NAMES } from '../types';
+import { BarChart3, Type, Smile, CalendarDays } from 'lucide-react';
 
 interface StatsViewProps {
   year: number;
   entries: DiaryEntry[];
 }
 
+const COLOR_DOT: Record<ColorTag, string> = {
+  red: 'bg-tag-red',
+  yellow: 'bg-tag-yellow',
+  green: 'bg-tag-green',
+};
+
 const StatsView: React.FC<StatsViewProps> = ({ year, entries }) => {
+  const [calMonth, setCalMonth] = useState(new Date().getMonth() + 1);
+
   const stats = useMemo(() => {
     let redCount = 0;
     let yellowCount = 0;
@@ -33,6 +41,22 @@ const StatsView: React.FC<StatsViewProps> = ({ year, entries }) => {
   }, [entries]);
 
   const maxMonthCount = Math.max(...stats.monthlyCounts, 1);
+
+  const calendarData = useMemo(() => {
+    const dayMap = new Map<number, DiaryEntry[]>();
+    entries.forEach(e => {
+      const d = new Date(e.timestamp);
+      if (d.getMonth() + 1 === calMonth) {
+        const day = d.getDate();
+        if (!dayMap.has(day)) dayMap.set(day, []);
+        dayMap.get(day)!.push(e);
+      }
+    });
+    return dayMap;
+  }, [entries, calMonth]);
+
+  const firstDay = new Date(year, calMonth - 1, 1).getDay();
+  const daysInMonth = new Date(year, calMonth, 0).getDate();
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
@@ -80,6 +104,75 @@ const StatsView: React.FC<StatsViewProps> = ({ year, entries }) => {
                     <span className="font-serif text-xl">{stats.greenCount}</span>
                 </div>
             </div>
+        </div>
+      </div>
+
+      {/* Calendar View */}
+      <div className="bg-white/60 p-8 rounded-lg border border-muted-gold/10 shadow-sm mb-8">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3 text-gray-500">
+            <CalendarDays className="w-5 h-5" />
+            <span className="text-xs uppercase tracking-widest">Monthly Calendar</span>
+          </div>
+          <select
+            value={calMonth}
+            onChange={e => setCalMonth(Number(e.target.value))}
+            className="text-xs uppercase tracking-widest bg-transparent border border-muted-gold/20 rounded px-2 py-1 text-charcoal outline-none cursor-pointer"
+          >
+            {MONTH_NAMES.map((name, i) => (
+              <option key={i} value={i + 1}>{name}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Week headers */}
+        <div className="grid grid-cols-7 mb-2">
+          {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => (
+            <div key={d} className="text-center text-[10px] uppercase tracking-widest text-gray-300 py-1">{d}</div>
+          ))}
+        </div>
+
+        {/* Day cells */}
+        <div className="grid grid-cols-7 gap-1">
+          {Array.from({ length: firstDay }).map((_, i) => (
+            <div key={`empty-${i}`} />
+          ))}
+          {Array.from({ length: daysInMonth }).map((_, i) => {
+            const day = i + 1;
+            const dayEntries = calendarData.get(day);
+            const hasEntries = !!dayEntries && dayEntries.length > 0;
+            const colors = hasEntries
+              ? [...new Set(dayEntries.map(e => e.colorTag).filter(Boolean) as ColorTag[])]
+              : [];
+
+            return (
+              <div
+                key={day}
+                className={`rounded-md p-1 flex flex-col items-center min-h-[52px] transition-colors ${
+                  hasEntries ? 'bg-muted-gold/10' : 'bg-transparent'
+                }`}
+              >
+                <span className={`text-[11px] font-serif w-full text-center ${hasEntries ? 'text-charcoal font-bold' : 'text-gray-300'}`}>
+                  {day}
+                </span>
+                {hasEntries && (
+                  <>
+                    <span className="text-[10px] text-gray-400 font-serif leading-none mt-0.5">
+                      ×{dayEntries!.length}
+                    </span>
+                    <div className="flex gap-0.5 mt-1 flex-wrap justify-center">
+                      {colors.length > 0
+                        ? colors.map(c => (
+                            <div key={c} className={`w-2 h-2 rounded-full ${COLOR_DOT[c]}`} />
+                          ))
+                        : <div className="w-2 h-2 rounded-full bg-muted-gold/40" />
+                      }
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 
